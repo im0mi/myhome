@@ -1,2 +1,2 @@
 # myhome
-My Happy Place
+My Happy
