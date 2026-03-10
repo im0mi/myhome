@@ -2,63 +2,104 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>最简小游戏</title>
+    <title>戳方块</title>
     <style>
-        /* 画布样式 */
-        #gameCanvas {
-            border: 2px solid black;
-            cursor: pointer;
-            display: block;
-            margin: 20px auto;
-        }
-        body { text-align: center; font-family: sans-serif; }
+        body { text-align: center; font-family: 'Arial', sans-serif; background: #f0f0f0; }
+        #gameCanvas { background: white; border: 4px solid #333; cursor: crosshair; display: block; margin: 10px auto; }
+        .stats { font-size: 20px; font-weight: bold; color: #333; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #28a745; color: white; border: none; border-radius: 5px; }
+        button:disabled { background: #ccc; }
     </style>
 </head>
 <body>
-    <h1>得分: <span id="score">0</span></h1>
+    <h1>戳方块挑战</h1>
+    <div class="stats">
+        得分: <span id="score">0</span> | 剩余时间: <span id="timer">30</span>s
+    </div>
     <canvas id="gameCanvas" width="400" height="400"></canvas>
+    <br>
+    <button id="startBtn">开始游戏</button>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const scoreElement = document.getElementById('score');
+        const timerElement = document.getElementById('timer');
+        const startBtn = document.getElementById('startBtn');
 
         let score = 0;
-        let x = 100; // 方块的初始X坐标
-        let y = 100; // 方块的初始Y坐标
-        const size = 50; // 方块的大小
+        let timeLeft = 30;
+        let gameActive = false;
+        let x, y;
+        const size = 40;
+        let moveInterval; // 用于控制方块自动跳动的定时器
+        let countdownInterval; // 用于计时的定时器
 
-        // 绘制函数
-        function draw() {
-            // 1. 清空画布
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            // 2. 画一个红色的方块
-            ctx.fillStyle = 'red';
-            ctx.fillRect(x, y, size, size);
+        function spawnTarget() {
+            x = Math.random() * (canvas.width - size);
+            y = Math.random() * (canvas.height - size);
+            draw();
         }
 
-        // 监听点击事件
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (gameActive) {
+                ctx.fillStyle = '#ff4757';
+                ctx.fillRect(x, y, size, size);
+            }
+        }
+
+        function startGame() {
+            // 初始化状态
+            score = 0;
+            timeLeft = 30;
+            gameActive = true;
+            scoreElement.innerText = score;
+            timerElement.innerText = timeLeft;
+            startBtn.disabled = true;
+
+            spawnTarget();
+
+            // 开启倒计时
+            countdownInterval = setInterval(() => {
+                timeLeft--;
+                timerElement.innerText = timeLeft;
+                if (timeLeft <= 0) endGame();
+            }, 1000);
+
+            // 让方块每 800 毫秒自动跳一次，增加难度
+            moveInterval = setInterval(spawnTarget, 800);
+        }
+
+        function endGame() {
+            gameActive = false;
+            clearInterval(countdownInterval);
+            clearInterval(moveInterval);
+            startBtn.disabled = false;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            alert("游戏结束！最终得分：" + score);
+        }
+
         canvas.addEventListener('mousedown', function(e) {
-            // 获取点击在画布上的坐标
+            if (!gameActive) return;
+
             const rect = canvas.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
             const mouseY = e.clientY - rect.top;
 
-            // 判断是否点中了方块
+            // 判断点中
             if (mouseX > x && mouseX < x + size && mouseY > y && mouseY < y + size) {
                 score++;
-                scoreElement.innerText = score; // 更新分数
+                scoreElement.innerText = score;
                 
-                // 随机移动方块位置
-                x = Math.random() * (canvas.width - size);
-                y = Math.random() * (canvas.height - size);
-                
-                draw(); // 重新绘制
+                // 点中后立即重置自动跳动定时器，并刷新位置
+                clearInterval(moveInterval);
+                moveInterval = setInterval(spawnTarget, 800);
+                spawnTarget();
             }
         });
 
-        // 初始画一次
-        draw();
+        startBtn.addEventListener('click', startGame);
     </script>
 </body>
 </html>
