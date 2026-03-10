@@ -2,289 +2,282 @@
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>星际碎裂：狂热连击</title>
-    <!-- 引入 GSAP 动画库 -->
+    <title>CORE CRUSHER: NEON OVERDRIVE</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&display=swap" rel="stylesheet">
     <style>
         :root {
-            --glow: #00d2ff;
-            --danger: #ff0055;
-            --gold: #ffcc00;
+            --neon-blue: #00f3ff;
+            --neon-pink: #ff00ff;
+            --neon-gold: #ffcf00;
         }
         body {
-            margin: 0; overflow: hidden; background: #050505;
+            margin: 0; overflow: hidden; background: #020205;
             font-family: 'Orbitron', sans-serif; color: white; user-select: none;
         }
-        /* 游戏背景图 */
-        #bg {
-            position: fixed; inset: 0;
-            background: url('https://images.unsplash.com/photo-1475274047050-1d0c0975c63e?auto=format&fit=crop&w=1920&q=80') center/cover;
-            opacity: 0.4; filter: blur(2px); z-index: -1;
+        canvas { display: block; filter: contrast(1.2) brightness(1.1); }
+
+        /* 扫描线效果 */
+        body::after {
+            content: " "; position: fixed; inset: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 4px, 3px 100%; pointer-events: none; z-index: 10;
         }
-        /* 顶层UI */
-        #ui-header {
-            position: absolute; top: 20px; width: 100%;
-            display: flex; justify-content: space-around; align-items: center;
-            pointer-events: none; z-index: 5;
+
+        #ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; padding: 30px; box-sizing: border-box;
+            display: flex; flex-direction: column; justify-content: space-between;
         }
-        .stat-box {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            padding: 10px 25px; border-radius: 15px;
-            border: 1px solid rgba(255,255,255,0.2);
-            text-align: center;
+
+        .hud-box {
+            border-left: 4px solid var(--neon-blue);
+            background: linear-gradient(90deg, rgba(0, 243, 255, 0.1), transparent);
+            padding: 10px 20px; text-shadow: 0 0 10px var(--neon-blue);
         }
-        #combo-wrap {
-            position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
-            text-align: center; pointer-events: none;
+
+        #combo-container {
+            position: absolute; right: 50px; top: 50%; transform: translateY(-50%);
+            text-align: right;
         }
-        #combo-num { font-size: 80px; font-weight: 900; color: var(--glow); margin: 0; }
-        
-        /* 结算弹窗 */
-        #modal {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.9);
+        #combo-val { font-size: 80px; font-weight: 900; color: var(--neon-pink); line-height: 0.8; }
+
+        #overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.85);
             display: flex; align-items: center; justify-content: center; z-index: 100;
+            backdrop-filter: blur(10px);
         }
-        .card {
-            background: rgba(30, 30, 30, 0.8); border: 2px solid var(--glow);
-            padding: 50px; border-radius: 30px; text-align: center;
-            box-shadow: 0 0 50px var(--glow);
+
+        .menu-card {
+            text-align: center; border: 1px solid var(--neon-blue);
+            padding: 60px; background: rgba(0,0,0,0.5);
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.3);
         }
-        button {
-            background: var(--glow); color: black; border: none;
-            padding: 15px 40px; font-size: 20px; font-weight: bold;
-            border-radius: 50px; cursor: pointer; margin-top: 20px;
+
+        .btn-glitch {
+            background: var(--neon-blue); color: black; border: none;
+            padding: 15px 50px; font-family: 'Orbitron'; font-weight: 900;
+            cursor: pointer; clip-path: polygon(10% 0, 100% 0, 90% 100%, 0 100%);
+            transition: 0.2s;
         }
-        .hidden { display: none !important; }
+        .btn-glitch:hover {
+            background: var(--neon-pink); box-shadow: 0 0 20px var(--neon-pink);
+        }
     </style>
 </head>
 <body>
-    <div id="bg"></div>
-    
-    <div id="ui-header">
-        <div class="stat-box">
-            <div style="font-size: 12px; opacity: 0.7;">SCORE</div>
-            <div id="score" style="font-size: 28px;">0</div>
-        </div>
-        <div class="stat-box" id="timer-box">
-            <div style="font-size: 12px; opacity: 0.7;">TIME</div>
-            <div id="timer" style="font-size: 28px;">30</div>
-        </div>
-        <div class="stat-box">
-            <div style="font-size: 12px; opacity: 0.7;">BEST</div>
-            <div id="highScore" style="font-size: 28px;">0</div>
-        </div>
-    </div>
 
-    <div id="combo-wrap" class="hidden">
-        <p id="combo-num">0</p>
-        <p style="letter-spacing: 5px;">COMBO</p>
-    </div>
+    <canvas id="canvas"></canvas>
 
-    <div id="modal">
-        <div class="card">
-            <h1 id="title" style="font-size: 40px; margin-top: 0;">星际碎裂</h1>
-            <p id="desc">摧毁发光的能量核心，保持连击！</p>
-            <button id="startBtn">进入系统</button>
+    <div id="ui-layer">
+        <div style="display: flex; justify-content: space-between;">
+            <div class="hud-box">
+                <div style="font-size: 12px;">SYSTEM_SCORE</div>
+                <div id="score" style="font-size: 32px;">0000</div>
+            </div>
+            <div class="hud-box" style="border-left-color: var(--neon-pink);">
+                <div style="font-size: 12px;">TIME_REMAINING</div>
+                <div id="timer" style="font-size: 32px;">30.0s</div>
+            </div>
+        </div>
+        <div id="combo-container" style="opacity: 0;">
+            <div style="font-size: 14px;">MULTIPLIER</div>
+            <div id="combo-val">X12</div>
         </div>
     </div>
 
-    <canvas id="gameCanvas"></canvas>
+    <div id="overlay">
+        <div class="menu-card">
+            <h1 style="font-size: 48px; margin: 0; color: var(--neon-blue);">CORE CRUSHER</h1>
+            <p style="letter-spacing: 4px; opacity: 0.6; margin-bottom: 40px;">NEON OVERDRIVE v5.0</p>
+            <button class="btn-glitch" onclick="startGame()">INITIALIZE</button>
+        </div>
+    </div>
 
-    <script>
-        /** 
-         * 游戏引擎核心
-         */
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        let score = 0, timeLeft = 30, combo = 0, gameActive = false;
-        let targets = [], particles = [];
-        let comboTimer = null;
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let score = 0, combo = 0, timeLeft = 30, gameActive = false;
+    let targets = [], particles = [], floatingTexts = [];
 
-        // 资源定义 (SVG 图标转 DataURI)
-        const ICONS = {
-            bomb: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ff0055'%3E%3Cpath d='M14 2L11 5L15 9L18 6L14 2M11 6C6.58 6 3 9.58 3 14C3 18.42 6.58 22 11 22C15.42 22 19 18.42 19 14C19 12.5 18.6 11.11 17.9 9.9L11 6Z'/%3E%3C/svg%3E"
-        };
-        const bombImg = new Image(); bombImg.src = ICONS.bomb;
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
 
-        function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
+    // 1. 动态背景：星海
+    const stars = Array(100).fill().map(() => ({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        size: Math.random() * 2,
+        speed: Math.random() * 0.5 + 0.1
+    }));
+
+    class FloatingText {
+        constructor(x, y, text, color) {
+            this.x = x; this.y = y; this.text = text; this.color = color;
+            this.opacity = 1;
+            gsap.to(this, { y: y - 50, opacity: 0, duration: 1, onComplete: () => {
+                floatingTexts = floatingTexts.filter(t => t !== this);
+            }});
         }
-        window.addEventListener('resize', resize);
-        resize();
-
-        // 粒子系统类
-        class Particle {
-            constructor(x, y, color) {
-                this.x = x; this.y = y;
-                this.color = color;
-                this.angle = Math.random() * Math.PI * 2;
-                this.speed = Math.random() * 8 + 2;
-                this.friction = 0.95;
-                this.gravity = 0.2;
-                this.alpha = 1;
-                this.size = Math.random() * 4 + 1;
-            }
-            update() {
-                this.speed *= this.friction;
-                this.x += Math.cos(this.angle) * this.speed;
-                this.y += Math.sin(this.angle) * this.speed + this.gravity;
-                this.alpha -= 0.02;
-            }
-            draw() {
-                ctx.save();
-                ctx.globalAlpha = this.alpha;
-                ctx.fillStyle = this.color;
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
-                ctx.fill();
-                ctx.restore();
-            }
+        draw() {
+            ctx.save();
+            ctx.globalAlpha = this.opacity;
+            ctx.fillStyle = this.color;
+            ctx.font = "bold 20px Orbitron";
+            ctx.fillText(this.text, this.x, this.y);
+            ctx.restore();
         }
+    }
 
-        class Target {
-            constructor() {
-                this.radius = 30 + Math.random() * 20;
-                this.x = Math.random() * (canvas.width - 100) + 50;
-                this.y = Math.random() * (canvas.height - 100) + 50;
-                this.type = Math.random() < 0.15 ? 'bomb' : (Math.random() < 0.1 ? 'gold' : 'normal');
-                this.color = this.type === 'bomb' ? '#ff0055' : (this.type === 'gold' ? '#ffcc00' : '#00d2ff');
-                this.scale = 0;
-                gsap.to(this, { scale: 1, duration: 0.5, ease: "back.out(1.7)" });
-                this.alive = true;
-                this.expiry = setTimeout(() => this.die(), 2000 - Math.min(1000, score*10));
-            }
-            die() {
-                if(!this.alive) return;
-                gsap.to(this, { scale: 0, duration: 0.3, onComplete: () => {
-                    targets = targets.filter(t => t !== this);
-                }});
-            }
-            draw() {
-                ctx.save();
-                ctx.translate(this.x, this.y);
-                ctx.scale(this.scale, this.scale);
-                
-                // 绘制发光光晕
-                const grad = ctx.createRadialGradient(0,0,0, 0,0,this.radius);
-                grad.addColorStop(0, this.color);
-                grad.addColorStop(1, 'transparent');
-                ctx.fillStyle = grad;
-                ctx.globalAlpha = 0.5;
-                ctx.beginPath(); ctx.arc(0,0,this.radius,0,Math.PI*2); ctx.fill();
-
-                // 核心
-                ctx.globalAlpha = 1;
-                ctx.strokeStyle = this.color;
-                ctx.lineWidth = 3;
-                ctx.beginPath(); ctx.arc(0,0,this.radius/2,0,Math.PI*2); ctx.stroke();
-                
-                if(this.type === 'bomb') ctx.drawImage(bombImg, -15, -15, 30, 30);
-                
-                ctx.restore();
-            }
+    class CoreTarget {
+        constructor() {
+            this.radius = 35 + Math.random() * 15;
+            this.x = Math.random() * (canvas.width - 100) + 50;
+            this.y = Math.random() * (canvas.height - 100) + 50;
+            this.type = Math.random() < 0.15 ? 'BOMB' : (Math.random() < 0.1 ? 'GOLD' : 'CORE');
+            this.color = this.type === 'BOMB' ? '#ff0055' : (this.type === 'GOLD' ? '#ffcf00' : '#00f3ff');
+            this.rotation = 0;
+            this.scale = 0;
+            this.life = 1.0;
+            gsap.to(this, { scale: 1, duration: 0.4, ease: "back.out(2)" });
         }
 
-        function createExplosion(x, y, color) {
-            for(let i=0; i<15; i++) particles.push(new Particle(x, y, color));
+        draw(time) {
+            this.rotation += 0.02;
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.scale(this.scale, this.scale);
+
+            // 绘制外环
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([15, 10]);
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius, this.rotation, this.rotation + Math.PI * 2);
+            ctx.stroke();
+
+            // 绘制内核
+            const pulse = Math.sin(time / 200) * 5;
+            const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius/2 + pulse);
+            grad.addColorStop(0, this.color);
+            grad.addColorStop(1, 'transparent');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius/2 + pulse, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 辅助装饰
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.moveTo(-this.radius-5, 0); ctx.lineTo(-this.radius+5, 0);
+            ctx.moveTo(this.radius-5, 0); ctx.lineTo(this.radius+5, 0);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+    }
+
+    function spawnTarget() {
+        if(targets.length < 6) targets.push(new CoreTarget());
+    }
+
+    function update(time) {
+        if(!gameActive) return;
+        ctx.fillStyle = '#020205';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // 背景星空
+        ctx.fillStyle = "white";
+        stars.forEach(s => {
+            s.y += s.speed;
+            if(s.y > canvas.height) s.y = 0;
+            ctx.fillRect(s.x, s.y, s.size, s.size);
+        });
+
+        if(Math.random() < 0.04) spawnTarget();
+
+        targets.forEach(t => t.draw(time));
+        floatingTexts.forEach(ft => ft.draw());
+
+        requestAnimationFrame(update);
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+        if(!gameActive) return;
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+
+        let hit = false;
+        for(let i=targets.length-1; i>=0; i--) {
+            const t = targets[i];
+            const dist = Math.hypot(mx - t.x, my - t.y);
+            if(dist < t.radius) {
+                hit = true;
+                processHit(t);
+                targets.splice(i, 1);
+                break;
+            }
         }
 
-        function handleHit(e) {
-            if(!gameActive) return;
-            const rect = canvas.getBoundingClientRect();
-            const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-
-            let hitSomething = false;
-            for(let i=targets.length-1; i>=0; i--) {
-                const t = targets[i];
-                const dist = Math.hypot(mx - t.x, my - t.y);
-                if(dist < t.radius) {
-                    hitSomething = true;
-                    processHit(t);
-                    targets.splice(i, 1);
-                    break;
-                }
-            }
-
-            if(!hitSomething) {
-                combo = 0;
-                document.getElementById('combo-wrap').classList.add('hidden');
-            }
+        if(!hit) {
+            combo = 0;
+            gsap.to("#combo-container", { opacity: 0 });
         }
+    });
 
-        function processHit(t) {
-            createExplosion(t.x, t.y, t.color);
-            if(t.type === 'bomb') {
-                score = Math.max(0, score - 10);
-                combo = 0;
-                gsap.to("body", { backgroundColor: "#400", duration: 0.1, yoyo: true, repeat: 1 });
-            } else {
-                combo++;
-                const points = t.type === 'gold' ? 10 : 1;
-                score += points * Math.min(combo, 10);
-                
-                // Combo UI 动画
-                const comboWrap = document.getElementById('combo-wrap');
-                const comboNum = document.getElementById('combo-num');
-                comboWrap.classList.remove('hidden');
-                comboNum.innerText = combo;
-                gsap.fromTo(comboNum, {scale: 1.5, rotate: -10}, {scale: 1, rotate: 0, duration: 0.2});
-            }
-            document.getElementById('score').innerText = score;
-        }
-
-        function update() {
-            if(!gameActive) return;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+    function processHit(t) {
+        if(t.type === 'BOMB') {
+            score = Math.max(0, score - 50);
+            combo = 0;
+            floatingTexts.push(new FloatingText(t.x, t.y, "-50 CRITICAL ERROR", "#ff0055"));
+            gsap.to("#combo-container", { opacity: 0 });
+            gsap.fromTo("body", { filter: "invert(1)" }, { filter: "invert(0)", duration: 0.2 });
+        } else {
+            combo++;
+            const basePoints = t.type === 'GOLD' ? 50 : 10;
+            const finalPoints = basePoints * (1 + Math.floor(combo/5));
+            score += finalPoints;
             
-            if(Math.random() < 0.03 + (score*0.0001)) targets.push(new Target());
-
-            targets.forEach(t => t.draw());
-            particles.forEach((p, i) => {
-                p.update();
-                p.draw();
-                if(p.alpha <= 0) particles.splice(i, 1);
-            });
-
-            requestAnimationFrame(update);
-        }
-
-        function startGame() {
-            score = 0; timeLeft = 30; combo = 0;
-            targets = []; particles = []; gameActive = true;
-            document.getElementById('modal').classList.add('hidden');
-            document.getElementById('score').innerText = "0";
+            floatingTexts.push(new FloatingText(t.x, t.y, `+${finalPoints}`, t.color));
             
-            const timerInt = setInterval(() => {
-                timeLeft--;
-                document.getElementById('timer').innerText = timeLeft;
-                if(timeLeft <= 10) document.getElementById('timer-box').style.color = 'var(--danger)';
-                if(timeLeft <= 0) {
-                    clearInterval(timerInt);
-                    endGame();
-                }
-            }, 1000);
-
-            update();
-        }
-
-        function endGame() {
-            gameActive = false;
-            document.getElementById('modal').classList.remove('hidden');
-            document.getElementById('title').innerText = "战绩评价";
-            document.getElementById('desc').innerText = `最终得分: ${score} | 最大连击: ${combo}`;
-            const high = localStorage.getItem('starBest') || 0;
-            if(score > high) {
-                localStorage.setItem('starBest', score);
-                document.getElementById('highScore').innerText = score;
+            if(combo > 1) {
+                document.getElementById('combo-val').innerText = `X${combo}`;
+                gsap.to("#combo-container", { opacity: 1, scale: 1.2, duration: 0.1, yoyo: true, repeat: 1 });
             }
         }
+        document.getElementById('score').innerText = score.toString().padStart(4, '0');
+    }
 
-        canvas.addEventListener('mousedown', handleHit);
-        document.getElementById('startBtn').addEventListener('click', startGame);
-        document.getElementById('highScore').innerText = localStorage.getItem('starBest') || 0;
-    </script>
+    function startGame() {
+        score = 0; timeLeft = 30; combo = 0; targets = []; gameActive = true;
+        document.getElementById('overlay').style.display = 'none';
+        
+        // UI 入场动画
+        gsap.from(".hud-box", { x: -100, opacity: 0, stagger: 0.2, duration: 0.8 });
+
+        const timerInterval = setInterval(() => {
+            timeLeft -= 0.1;
+            document.getElementById('timer').innerText = timeLeft.toFixed(1) + 's';
+            if(timeLeft <= 0) {
+                clearInterval(timerInterval);
+                endGame();
+            }
+        }, 100);
+
+        update(0);
+    }
+
+    function endGame() {
+        gameActive = false;
+        document.getElementById('overlay').style.display = 'flex';
+        document.querySelector('h1').innerText = "MISSION COMPLETE";
+        document.querySelector('p').innerText = `TOTAL SCORE: ${score} | MAX COMBO: ${combo}`;
+    }
+</script>
 </body>
 </html>
