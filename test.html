@@ -2,82 +2,139 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>戳方块</title>
+    <title>进阶版：戳气球</title>
     <style>
-        body { text-align: center; font-family: 'Arial', sans-serif; background: #f0f0f0; }
-        #gameCanvas { background: white; border: 4px solid #333; cursor: crosshair; display: block; margin: 10px auto; }
-        .stats { font-size: 20px; font-weight: bold; color: #333; }
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #28a745; color: white; border: none; border-radius: 5px; }
-        button:disabled { background: #ccc; }
+        body { text-align: center; font-family: 'Microsoft YaHei', sans-serif; background: #eef2f3; margin: 0; padding: 20px; }
+        .container { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: inline-block; }
+        #gameCanvas { background: #f8f9fa; border-radius: 10px; cursor: crosshair; display: block; margin: 10px auto; }
+        .stats { display: flex; justify-content: space-around; font-size: 18px; margin-bottom: 10px; color: #444; }
+        .high-score { color: #e67e22; font-weight: bold; }
+        button { padding: 12px 30px; font-size: 18px; cursor: pointer; background: #3498db; color: white; border: none; border-radius: 25px; transition: 0.3s; }
+        button:hover { background: #2980b9; transform: scale(1.05); }
+        button:disabled { background: #bdc3c7; transform: none; }
     </style>
 </head>
 <body>
-    <h1>戳方块挑战</h1>
-    <div class="stats">
-        得分: <span id="score">0</span> | 剩余时间: <span id="timer">30</span>s
+    <div class="container">
+        <h1>气球挑战赛</h1>
+        <div class="stats">
+            <div>得分: <span id="score">0</span></div>
+            <div class="high-score">最高分: <span id="highScore">0</span></div>
+            <div>时间: <span id="timer">30</span>s</div>
+        </div>
+        <canvas id="gameCanvas" width="500" height="400"></canvas>
+        <br>
+        <button id="startBtn">开始游戏</button>
     </div>
-    <canvas id="gameCanvas" width="400" height="400"></canvas>
-    <br>
-    <button id="startBtn">开始游戏</button>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const scoreElement = document.getElementById('score');
         const timerElement = document.getElementById('timer');
+        const highScoreElement = document.getElementById('highScore');
         const startBtn = document.getElementById('startBtn');
 
         let score = 0;
         let timeLeft = 30;
         let gameActive = false;
-        let x, y;
-        const size = 40;
-        let moveInterval; // 用于控制方块自动跳动的定时器
-        let countdownInterval; // 用于计时的定时器
+        let target = { x: 0, y: 0, radius: 25, color: '#ff4757' };
+        let particles = []; // 用于存储点击后的“+1”漂浮文字
+        let moveTimer = 0;
+        let gameInterval;
+        let highScore = localStorage.getItem('balloonHighScore') || 0;
+
+        highScoreElement.innerText = highScore;
 
         function spawnTarget() {
-            x = Math.random() * (canvas.width - size);
-            y = Math.random() * (canvas.height - size);
+            target.x = target.radius + Math.random() * (canvas.width - target.radius * 2);
+            target.y = target.radius + Math.random() * (canvas.height - target.radius * 2);
+            // 每次生成随机颜色
+            target.color = `hsl(${Math.random() * 360}, 70%, 60%)`;
+        }
+
+        function createParticle(x, y) {
+            particles.push({ x, y, opacity: 1, life: 40 });
+        }
+
+        function update() {
+            if (!gameActive) return;
+
+            // 动态难度：分数越高，停留时间越短（1000ms 逐渐降至 400ms）
+            let speed = Math.max(400, 1000 - score * 30);
+            
+            if (Date.now() - moveTimer > speed) {
+                spawnTarget();
+                moveTimer = Date.now();
+            }
+
+            // 更新粒子动画
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].y -= 1;
+                particles[i].opacity -= 0.02;
+                if (particles[i].life-- <= 0) particles.splice(i, 1);
+            }
+
             draw();
+            requestAnimationFrame(update);
         }
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+
             if (gameActive) {
-                ctx.fillStyle = '#ff4757';
-                ctx.fillRect(x, y, size, size);
+                // 绘制目标（带阴影的圆球）
+                ctx.beginPath();
+                ctx.arc(target.x, target.y, target.radius, 0, Math.PI * 2);
+                ctx.fillStyle = target.color;
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = target.color;
+                ctx.fill();
+                ctx.closePath();
+                ctx.shadowBlur = 0; // 重置阴影，不影响其他绘制
+
+                // 绘制“+1”特效
+                ctx.font = "bold 20px Arial";
+                particles.forEach(p => {
+                    ctx.fillStyle = `rgba(52, 152, 219, ${p.opacity})`;
+                    ctx.fillText("+1", p.x, p.y);
+                });
             }
         }
 
         function startGame() {
-            // 初始化状态
             score = 0;
             timeLeft = 30;
             gameActive = true;
+            particles = [];
             scoreElement.innerText = score;
             timerElement.innerText = timeLeft;
             startBtn.disabled = true;
-
+            
             spawnTarget();
+            moveTimer = Date.now();
+            update(); // 启动动画循环
 
-            // 开启倒计时
-            countdownInterval = setInterval(() => {
+            gameInterval = setInterval(() => {
                 timeLeft--;
                 timerElement.innerText = timeLeft;
                 if (timeLeft <= 0) endGame();
             }, 1000);
-
-            // 让方块每 800 毫秒自动跳一次，增加难度
-            moveInterval = setInterval(spawnTarget, 800);
         }
 
         function endGame() {
             gameActive = false;
-            clearInterval(countdownInterval);
-            clearInterval(moveInterval);
+            clearInterval(gameInterval);
             startBtn.disabled = false;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            alert("游戏结束！最终得分：" + score);
+
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('balloonHighScore', highScore);
+                highScoreElement.innerText = highScore;
+                alert("太棒了！新纪录：" + score);
+            } else {
+                alert("游戏结束！得分：" + score);
+            }
         }
 
         canvas.addEventListener('mousedown', function(e) {
@@ -87,15 +144,15 @@
             const mouseX = e.clientX - rect.left;
             const mouseY = e.clientY - rect.top;
 
-            // 判断点中
-            if (mouseX > x && mouseX < x + size && mouseY > y && mouseY < y + size) {
+            // 使用勾股定理计算点击距离，判断是否点中圆形
+            const dist = Math.sqrt((mouseX - target.x)**2 + (mouseY - target.y)**2);
+
+            if (dist < target.radius) {
                 score++;
                 scoreElement.innerText = score;
-                
-                // 点中后立即重置自动跳动定时器，并刷新位置
-                clearInterval(moveInterval);
-                moveInterval = setInterval(spawnTarget, 800);
+                createParticle(target.x, target.y);
                 spawnTarget();
+                moveTimer = Date.now(); // 重置跳动时间
             }
         });
 
