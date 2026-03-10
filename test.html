@@ -1,66 +1,112 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh">
 <head>
     <meta charset="UTF-8">
-    <title>气球大作战：狂热版</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>星际碎裂：狂热连击</title>
+    <!-- 引入 GSAP 动画库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
-        :root { --primary: #3498db; --danger: #ff4757; --gold: #f1c40f; }
-        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', system-ui; background: #2c3e50; color: white; user-select: none; }
-        #ui-layer { position: absolute; top: 20px; left: 0; width: 100%; pointer-events: none; display: flex; justify-content: space-around; font-size: 24px; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
-        canvas { display: block; background: radial-gradient(circle, #34495e, #2c3e50); }
-        #overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
-        .menu-card { background: white; color: #333; padding: 40px; border-radius: 20px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        button { background: var(--primary); color: white; border: none; padding: 15px 40px; font-size: 20px; border-radius: 50px; cursor: pointer; transition: 0.2s; margin-top: 20px; }
-        button:hover { transform: scale(1.1); background: #2980b9; }
+        :root {
+            --glow: #00d2ff;
+            --danger: #ff0055;
+            --gold: #ffcc00;
+        }
+        body {
+            margin: 0; overflow: hidden; background: #050505;
+            font-family: 'Orbitron', sans-serif; color: white; user-select: none;
+        }
+        /* 游戏背景图 */
+        #bg {
+            position: fixed; inset: 0;
+            background: url('https://images.unsplash.com/photo-1475274047050-1d0c0975c63e?auto=format&fit=crop&w=1920&q=80') center/cover;
+            opacity: 0.4; filter: blur(2px); z-index: -1;
+        }
+        /* 顶层UI */
+        #ui-header {
+            position: absolute; top: 20px; width: 100%;
+            display: flex; justify-content: space-around; align-items: center;
+            pointer-events: none; z-index: 5;
+        }
+        .stat-box {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 10px 25px; border-radius: 15px;
+            border: 1px solid rgba(255,255,255,0.2);
+            text-align: center;
+        }
+        #combo-wrap {
+            position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
+            text-align: center; pointer-events: none;
+        }
+        #combo-num { font-size: 80px; font-weight: 900; color: var(--glow); margin: 0; }
+        
+        /* 结算弹窗 */
+        #modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.9);
+            display: flex; align-items: center; justify-content: center; z-index: 100;
+        }
+        .card {
+            background: rgba(30, 30, 30, 0.8); border: 2px solid var(--glow);
+            padding: 50px; border-radius: 30px; text-align: center;
+            box-shadow: 0 0 50px var(--glow);
+        }
+        button {
+            background: var(--glow); color: black; border: none;
+            padding: 15px 40px; font-size: 20px; font-weight: bold;
+            border-radius: 50px; cursor: pointer; margin-top: 20px;
+        }
         .hidden { display: none !important; }
-        .shake { animation: shake 0.3s; }
-        @keyframes shake { 0%, 100% { transform: translate(0,0); } 25% { transform: translate(5px,5px); } 50% { transform: translate(-5px,-5px); } 75% { transform: translate(5px,-5px); } }
     </style>
 </head>
-<body id="body">
-    <div id="ui-layer">
-        <div>得分: <span id="score">0</span></div>
-        <div>时间: <span id="timer">30</span>s</div>
-        <div>最高分: <span id="highScore">0</span></div>
+<body>
+    <div id="bg"></div>
+    
+    <div id="ui-header">
+        <div class="stat-box">
+            <div style="font-size: 12px; opacity: 0.7;">SCORE</div>
+            <div id="score" style="font-size: 28px;">0</div>
+        </div>
+        <div class="stat-box" id="timer-box">
+            <div style="font-size: 12px; opacity: 0.7;">TIME</div>
+            <div id="timer" style="font-size: 28px;">30</div>
+        </div>
+        <div class="stat-box">
+            <div style="font-size: 12px; opacity: 0.7;">BEST</div>
+            <div id="highScore" style="font-size: 28px;">0</div>
+        </div>
     </div>
 
-    <div id="overlay">
-        <div class="menu-card">
-            <h1 id="msg-title">气球大作战</h1>
-            <p id="msg-desc">点击气球得分，避开黑色炸弹！</p>
-            <button id="startBtn">开始挑战</button>
+    <div id="combo-wrap" class="hidden">
+        <p id="combo-num">0</p>
+        <p style="letter-spacing: 5px;">COMBO</p>
+    </div>
+
+    <div id="modal">
+        <div class="card">
+            <h1 id="title" style="font-size: 40px; margin-top: 0;">星际碎裂</h1>
+            <p id="desc">摧毁发光的能量核心，保持连击！</p>
+            <button id="startBtn">进入系统</button>
         </div>
     </div>
 
     <canvas id="gameCanvas"></canvas>
 
     <script>
+        /** 
+         * 游戏引擎核心
+         */
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const startBtn = document.getElementById('startBtn');
-        const overlay = document.getElementById('overlay');
-        
-        // 游戏状态
-        let score = 0, timeLeft = 30, gameActive = false;
+        let score = 0, timeLeft = 30, combo = 0, gameActive = false;
         let targets = [], particles = [];
-        let highScore = localStorage.getItem('balloonMax') || 0;
-        let lastTime = 0, shakeTime = 0;
+        let comboTimer = null;
 
-        // 音效生成器 (Web Audio API)
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        function playSound(freq, type, duration) {
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.type = type;
-            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(10, audioCtx.currentTime + duration);
-            gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-            gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + duration);
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start();
-            osc.stop(audioCtx.currentTime + duration);
-        }
+        // 资源定义 (SVG 图标转 DataURI)
+        const ICONS = {
+            bomb: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ff0055'%3E%3Cpath d='M14 2L11 5L15 9L18 6L14 2M11 6C6.58 6 3 9.58 3 14C3 18.42 6.58 22 11 22C15.42 22 19 18.42 19 14C19 12.5 18.6 11.11 17.9 9.9L11 6Z'/%3E%3C/svg%3E"
+        };
+        const bombImg = new Image(); bombImg.src = ICONS.bomb;
 
         function resize() {
             canvas.width = window.innerWidth;
@@ -69,125 +115,176 @@
         window.addEventListener('resize', resize);
         resize();
 
+        // 粒子系统类
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x; this.y = y;
+                this.color = color;
+                this.angle = Math.random() * Math.PI * 2;
+                this.speed = Math.random() * 8 + 2;
+                this.friction = 0.95;
+                this.gravity = 0.2;
+                this.alpha = 1;
+                this.size = Math.random() * 4 + 1;
+            }
+            update() {
+                this.speed *= this.friction;
+                this.x += Math.cos(this.angle) * this.speed;
+                this.y += Math.sin(this.angle) * this.speed + this.gravity;
+                this.alpha -= 0.02;
+            }
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
         class Target {
             constructor() {
-                this.radius = 25 + Math.random() * 15;
-                this.x = Math.random() * (canvas.width - this.radius * 2) + this.radius;
-                this.y = Math.random() * (canvas.height - this.radius * 2) + this.radius;
-                this.life = 1.0; // 存活时间进度
-                this.decay = 0.01 + (score * 0.0005); // 随分数增加消失速度
-                
-                // 随机类型：80%普通, 10%金球, 10%炸弹
-                let r = Math.random();
-                if (r < 0.1) { this.type = 'gold'; this.color = '#f1c40f'; }
-                else if (r < 0.2) { this.type = 'bomb'; this.color = '#2d3436'; }
-                else { this.type = 'normal'; this.color = '#ff4757'; }
+                this.radius = 30 + Math.random() * 20;
+                this.x = Math.random() * (canvas.width - 100) + 50;
+                this.y = Math.random() * (canvas.height - 100) + 50;
+                this.type = Math.random() < 0.15 ? 'bomb' : (Math.random() < 0.1 ? 'gold' : 'normal');
+                this.color = this.type === 'bomb' ? '#ff0055' : (this.type === 'gold' ? '#ffcc00' : '#00d2ff');
+                this.scale = 0;
+                gsap.to(this, { scale: 1, duration: 0.5, ease: "back.out(1.7)" });
+                this.alive = true;
+                this.expiry = setTimeout(() => this.die(), 2000 - Math.min(1000, score*10));
             }
-
+            die() {
+                if(!this.alive) return;
+                gsap.to(this, { scale: 0, duration: 0.3, onComplete: () => {
+                    targets = targets.filter(t => t !== this);
+                }});
+            }
             draw() {
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.radius * this.life, 0, Math.PI * 2);
-                ctx.fillStyle = this.color;
-                ctx.shadowBlur = 15 * this.life;
-                ctx.shadowColor = this.color;
-                ctx.fill();
-                ctx.closePath();
-                ctx.shadowBlur = 0;
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.scale(this.scale, this.scale);
+                
+                // 绘制发光光晕
+                const grad = ctx.createRadialGradient(0,0,0, 0,0,this.radius);
+                grad.addColorStop(0, this.color);
+                grad.addColorStop(1, 'transparent');
+                ctx.fillStyle = grad;
+                ctx.globalAlpha = 0.5;
+                ctx.beginPath(); ctx.arc(0,0,this.radius,0,Math.PI*2); ctx.fill();
+
+                // 核心
+                ctx.globalAlpha = 1;
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 3;
+                ctx.beginPath(); ctx.arc(0,0,this.radius/2,0,Math.PI*2); ctx.stroke();
+                
+                if(this.type === 'bomb') ctx.drawImage(bombImg, -15, -15, 30, 30);
+                
+                ctx.restore();
             }
         }
 
-        function spawn() {
-            if (targets.length < 5) targets.push(new Target());
+        function createExplosion(x, y, color) {
+            for(let i=0; i<15; i++) particles.push(new Particle(x, y, color));
         }
 
-        function update(time) {
-            if (!gameActive) return;
-            const dt = time - lastTime;
-            lastTime = time;
-
-            // 处理震动效果
-            if (shakeTime > 0) {
-                document.getElementById('body').classList.add('shake');
-                shakeTime -= dt;
-            } else {
-                document.getElementById('body').classList.remove('shake');
-            }
-
-            // 更新目标状态
-            for (let i = targets.length - 1; i >= 0; i--) {
-                targets[i].life -= targets[i].decay;
-                if (targets[i].life <= 0) targets.splice(i, 1);
-            }
-
-            if (Math.random() < 0.05) spawn();
-
-            draw();
-            requestAnimationFrame(update);
-        }
-
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            targets.forEach(t => t.draw());
-        }
-
-        canvas.addEventListener('mousedown', (e) => {
-            if (!gameActive) return;
+        function handleHit(e) {
+            if(!gameActive) return;
             const rect = canvas.getBoundingClientRect();
             const mx = e.clientX - rect.left, my = e.clientY - rect.top;
 
-            for (let i = targets.length - 1; i >= 0; i--) {
+            let hitSomething = false;
+            for(let i=targets.length-1; i>=0; i--) {
                 const t = targets[i];
-                const dist = Math.sqrt((mx - t.x)**2 + (my - t.y)**2);
-                
-                if (dist < t.radius * t.life) {
-                    if (t.type === 'bomb') {
-                        score = Math.max(0, score - 5);
-                        shakeTime = 300;
-                        playSound(100, 'sawtooth', 0.4);
-                    } else {
-                        score += (t.type === 'gold' ? 5 : 1);
-                        playSound(t.type === 'gold' ? 800 : 400, 'sine', 0.1);
-                    }
-                    document.getElementById('score').innerText = score;
+                const dist = Math.hypot(mx - t.x, my - t.y);
+                if(dist < t.radius) {
+                    hitSomething = true;
+                    processHit(t);
                     targets.splice(i, 1);
                     break;
                 }
             }
-        });
+
+            if(!hitSomething) {
+                combo = 0;
+                document.getElementById('combo-wrap').classList.add('hidden');
+            }
+        }
+
+        function processHit(t) {
+            createExplosion(t.x, t.y, t.color);
+            if(t.type === 'bomb') {
+                score = Math.max(0, score - 10);
+                combo = 0;
+                gsap.to("body", { backgroundColor: "#400", duration: 0.1, yoyo: true, repeat: 1 });
+            } else {
+                combo++;
+                const points = t.type === 'gold' ? 10 : 1;
+                score += points * Math.min(combo, 10);
+                
+                // Combo UI 动画
+                const comboWrap = document.getElementById('combo-wrap');
+                const comboNum = document.getElementById('combo-num');
+                comboWrap.classList.remove('hidden');
+                comboNum.innerText = combo;
+                gsap.fromTo(comboNum, {scale: 1.5, rotate: -10}, {scale: 1, rotate: 0, duration: 0.2});
+            }
+            document.getElementById('score').innerText = score;
+        }
+
+        function update() {
+            if(!gameActive) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if(Math.random() < 0.03 + (score*0.0001)) targets.push(new Target());
+
+            targets.forEach(t => t.draw());
+            particles.forEach((p, i) => {
+                p.update();
+                p.draw();
+                if(p.alpha <= 0) particles.splice(i, 1);
+            });
+
+            requestAnimationFrame(update);
+        }
 
         function startGame() {
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            score = 0; timeLeft = 30; targets = []; gameActive = true;
-            document.getElementById('score').innerText = score;
-            document.getElementById('highScore').innerText = highScore;
-            overlay.classList.add('hidden');
+            score = 0; timeLeft = 30; combo = 0;
+            targets = []; particles = []; gameActive = true;
+            document.getElementById('modal').classList.add('hidden');
+            document.getElementById('score').innerText = "0";
             
             const timerInt = setInterval(() => {
                 timeLeft--;
                 document.getElementById('timer').innerText = timeLeft;
-                if (timeLeft <= 0) {
+                if(timeLeft <= 10) document.getElementById('timer-box').style.color = 'var(--danger)';
+                if(timeLeft <= 0) {
                     clearInterval(timerInt);
                     endGame();
                 }
             }, 1000);
 
-            lastTime = performance.now();
-            update(lastTime);
+            update();
         }
 
         function endGame() {
             gameActive = false;
-            overlay.classList.remove('hidden');
-            document.getElementById('msg-title').innerText = "时间到！";
-            document.getElementById('msg-desc').innerText = "最终得分：" + score;
-            if (score > highScore) {
-                highScore = score;
-                localStorage.setItem('balloonMax', highScore);
-                document.getElementById('msg-title').innerText = "新纪录！";
+            document.getElementById('modal').classList.remove('hidden');
+            document.getElementById('title').innerText = "战绩评价";
+            document.getElementById('desc').innerText = `最终得分: ${score} | 最大连击: ${combo}`;
+            const high = localStorage.getItem('starBest') || 0;
+            if(score > high) {
+                localStorage.setItem('starBest', score);
+                document.getElementById('highScore').innerText = score;
             }
         }
 
-        startBtn.addEventListener('click', startGame);
+        canvas.addEventListener('mousedown', handleHit);
+        document.getElementById('startBtn').addEventListener('click', startGame);
+        document.getElementById('highScore').innerText = localStorage.getItem('starBest') || 0;
     </script>
 </body>
 </html>
